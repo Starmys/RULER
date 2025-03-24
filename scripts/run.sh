@@ -16,23 +16,23 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <model_name> $1 <benchmark_name>"
-    exit 1
-fi
+# if [ $# -ne 2 ]; then
+#     echo "Usage: $0 <model_name> $1 <benchmark_name>"
+#     exit 1
+# fi
 
 
 # Root Directories
-GPUS="1" # GPU size for tensor_parallel.
-ROOT_DIR="benchmark_root" # the path that stores generated task samples and model predictions.
-MODEL_DIR="../.." # the path that contains individual model folders from HUggingface.
+GPUS="8" # GPU size for tensor_parallel.
+ROOT_DIR="/blob/evaluation/ruler/benchmark_root" # the path that stores generated task samples and model predictions.
+MODEL_DIR=${1} # the path that contains individual model folders from HUggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-BATCH_SIZE=1  # increase to improve GPU utilization
+BATCH_SIZE=8  # increase to improve GPU utilization
 
 
 # Model and Tokenizer
 source config_models.sh
-MODEL_NAME=${1}
+MODEL_NAME=${2}
 MODEL_CONFIG=$(MODEL_SELECT ${MODEL_NAME} ${MODEL_DIR} ${ENGINE_DIR})
 IFS=":" read MODEL_PATH MODEL_TEMPLATE_TYPE MODEL_FRAMEWORK TOKENIZER_PATH TOKENIZER_TYPE OPENAI_API_KEY GEMINI_API_KEY AZURE_ID AZURE_SECRET AZURE_ENDPOINT <<< "$MODEL_CONFIG"
 if [ -z "${MODEL_PATH}" ]; then
@@ -50,7 +50,7 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${2}
+BENCHMARK=synthetic
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
@@ -65,6 +65,8 @@ if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
         --tensor-parallel-size=${GPUS} \
         --dtype bfloat16 \
         --disable-custom-all-reduce \
+        --enforce-eager \
+        --trust-remote-code \
         &
 
 elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
